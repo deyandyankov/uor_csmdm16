@@ -1,7 +1,7 @@
 ---
 title: "CSMDM16 Assignment"
 author: "Deyan Dyankov (24885531)"
-date: "14/10/2016"
+date: "21/10/2016"
 output: pdf_document
 ---
 
@@ -27,8 +27,9 @@ In your coursework report, you should include:
 * the dendrogram generated with R code
 
 ## Solution in R
-We will be showcasing some code while doing the computations.
+The *teeth.csv* dataset is comprised of data on teeth configuration among different animals. This presents an opportunity to divide animals in groups based on the configuration of their teeth.
 
+We will be using some external libraries to aid the analysis.
 ```{r problem1, message=FALSE, warning=FALSE}
 library(dplyr) # general data cleaning and manipulation
 library(ggplot2) # nicer plots
@@ -42,7 +43,7 @@ Let's read the data from *teeth.csv*.
 ```{r warning=FALSE}
 # read the data file
 data_filename <- "data/teeth.csv"
-df <- read_csv(data_filename)
+df <- read_csv(data_filename) # headers applied
 ```
 
 This is how the data frame looks like:
@@ -52,8 +53,8 @@ head(df)
 
 There are 31 rows and 8 columns in the dataset. Let's retrieve required statistics for each variable - min, mean, max values and standard deviation.
 ```{r}
-df.s <- select(df, -Animal) %>%
-        gather() %>% 
+df.s <- select(df, -Animal) %>% # all columns except Animal
+        gather() %>%
         group_by(key) %>% 
         summarise(
                 "mean" = mean(value),
@@ -66,7 +67,7 @@ df.s <- select(df, -Animal) %>%
 kable(df.s)
 ```
 
-Now let's plot the above.
+Now let's plot the information from the table above.
 ```{r}
 ggplot(df.s, aes(key)) +
         geom_boxplot(
@@ -78,7 +79,6 @@ ggplot(df.s, aes(key)) +
 ```
 
 And here is a histogram of each and every attribute of the dataset.
-
 ```{r}
 hists <- gather(select(df, -Animal))
 hists$key <- as.factor(hists$key)
@@ -126,7 +126,7 @@ We first load the CSV file using a $FileReader$ node where we provide the filena
 
 The image below shows the KNIME flow and the output of the hierarchical clustering.
 
-![](images/problem1-dendro.png)
+![Animals dendrogram](images/problem1-dendro.png)
 This flow is exported as *csmdm_assignment_problem1.knar.knwf*.
 
 ## Problem #2 - Classification
@@ -154,20 +154,25 @@ The results, the KNIME workflows (with relevant node configurations) and the R c
 be included and commented in the coursework report.
 
 # Solution in R - WINE
-We will first perform our analysis on the wine dataset. Here we load it and provide a quick summary.
+The wine dataset is comprised of different wines with their properties and $class$ spelled out. This provides an opportunity to build a decisioon tree model that can allow us to predict the $class$ of a wine given its properties.
+
 ```{r}
+# load the data files
 wdf <- read_csv("https://archive.ics.uci.edu/ml/machine-learning-databases/wine/wine.data")
+# create a vector to use for column headers
 wdf_names <- c('class', 'alcohol', 'malic.acid', 'ash',
                'alcalinity.of.ash', 'magnesium', 'total.phenols', 'flavanoids',
                'nonflavanoid.phenols', 'proanthocyanins', 'color.intensity',
                'hue', 'od280od315.of.dliuted.wines', 'proline')
+# set column headers
 names(wdf) <- wdf_names
+# transform class from integer to a factor variable
 wdf$class <- as.factor(wdf$class)
+# show a summary of the data
 str(wdf)
 ```
 
-Below are definitions of the functions that we use for sampling.
-All four sampling algorithms return a list of the form list("test" = test_data_frame, "train" = train_data_frame).
+Now that we've loaded the data, we need to divide it into training and test sets using different sampling methods. Below are definitions of the functions that we use for sampling. All four sampling algorithms return a list of the form list("test" = test_data_frame, "train" = train_data_frame).
 ```{r}
 # implementation of the holdout method
 myholdout <- function(x, pct, shuffle=TRUE) {
@@ -190,7 +195,7 @@ myresub <- function(x, pct) {
         return(result)
 }
 
-# we run this with k=1..10
+# implementation of 10-fold cross validation
 my10fold <- function(x, k, shuffle=TRUE) {
         if (shuffle)
                 x <- x[sample(nrow(x), nrow(x)), ]
@@ -204,7 +209,7 @@ my10fold <- function(x, k, shuffle=TRUE) {
         return(result)
 }
 
-# uses kfold with k=1..10
+# implementation of leave-one-out using 10-fold cross validation
 myloocv <- function(x, k, shuffle=TRUE) {
         result <- my10fold(x, k, shuffle)
         result$test <- result$test[1, ]
@@ -213,15 +218,17 @@ myloocv <- function(x, k, shuffle=TRUE) {
 ```
 
 Since we've separated sampling from training methods, we can very easily plug in and test two classification algorithms instead of one.
-The first model builds a decision tree that predicts the "class" variable based on the rest of the variables.
+The first model builds a decision tree that predicts the $class$ variable based on the rest of the variables.
 The second model uses the same formula but sets *control = rpart.control(minsplit=5)* which results in a better performing model.
 ```{r}
+# first model predicts class based on all other variables
 mypredict_wine_model1 <- function(train, test) {
         dt <- rpart(class ~ ., data=train)
         predicted <- predict(dt, select(test, -class), type = "class")
         hit <- predicted == test$class
         return(sum(hit) / nrow(test))
 }
+# second model is a pruned version of the first model
 mypredict_wine_model2 <- function(train, test) {
         dt <- rpart(class ~ ., data=train, control = rpart.control(minsplit = 5))
         predicted <- predict(dt, select(test, -class), type = "class")
@@ -230,7 +237,7 @@ mypredict_wine_model2 <- function(train, test) {
 }
 ```
 
-The function below receives a dataframe and splits it in training and test data set using the four different sampling algorithms. It then applies the model it's being fed on every training and test set returned by the different sampling functions. The *class* variable is predicted by the model and crosschecked with the true value. The function finally returns a data frame with mean model accuracy for every model.
+The function below receives a dataframe and splits it in training and test data set using the four different sampling algorithms. It then applies the model it's being passed on every training and test set returned by the different sampling functions. The $class$ variable is predicted by the model and crosschecked with the true value. The function finally returns a data frame with mean model accuracy for every model.
 ```{r}
 get_accuracy_stats <- function(df, f_model, model_name) {
         accuracy <- data.frame()
@@ -254,7 +261,8 @@ get_accuracy_stats <- function(df, f_model, model_name) {
 }
 ```
 
-We proceed to run the function above 20 times with our two models, wine_model1 and wine_model2.
+We proceed to run the $get_accuracy_stats$ twenty times with our two models, $wine_model1$ and $wine_model2$.
+This will give us model accuracies for the two models using the four different sampling methods.
 ```{r}
 num_trials <- 20
 accuracy <- data.frame()
@@ -301,7 +309,7 @@ The chart above shows average accuracies over twenty trials for each of the four
 3. the holdout and 10-fold cross validation methods give us similar accuracy which is more stable than the one provided by the leave-one-out method.
 4. the most robust method with both models is 10-fold cross validation.
 
-Looking at the differences between the accuracies of both models we can see that pruning the tree has improved model performance. Setting minsplit=5 results in about 2% accuracy boost of the 10-fold cross validation method from model1 to model2.
+Looking at the differences between the accuracies of both models we can see that pruning the tree has improved model performance. Setting *minsplit=5* results in about *2%* accuracy boost of the 10-fold cross validation method from $model1$ to $model2$ using this particular dataset.
 
 This concludes our wine case study. We will now move on to the Titanic dataset.
 
@@ -316,12 +324,15 @@ head(tdf)
 
 We will predict $Survived$ using two different models defined below.
 ```{r}
+# predict survival based solely on sex
 mypredict_titanic_model1 <- function(train, test) {
         dt <- rpart(Survived ~ Sex, data=train)
         predicted <- predict(dt, select(test, -Survived), type = "class")
         hit <- predicted == test$Survived
         return(sum(hit) / nrow(test))
 }
+# predict survival based on passenger class, sex, age and other parameters
+# prune the tree at minsplit=5
 mypredict_titanic_model2 <- function(train, test) {
         dt <- rpart(
                 Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked,
@@ -333,7 +344,7 @@ mypredict_titanic_model2 <- function(train, test) {
 }
 ```
 
-For sampling we will use the functions we defined while exploring the wine dataset. We will again test 20 trials of four sampling methods and two different models.
+For sampling we will use the functions we defined while exploring the wine dataset. We will again test twenty trials of four sampling methods and two different models.
 ```{r}
 num_trials <- 20
 accuracy <- data.frame()
@@ -385,36 +396,34 @@ class, alcohol, malic.acid, ash, alcalinity.of.ash, magnesium, total.phenols, fl
 
 We then go through the following KNIME workflow:
 
-![](images/problem2-workflow.png)
+![WINE Workflow](images/problem2-workflow.png)
 
-The flow loads the wine dataset, changes the *class* column from Integer to String and proceeds to run 20 iterations of four different sampling methods. The result from the sampling is passed to decision tree learners and predictors using the same parameters. Accuracy statistics for each sampling method are gathered and finally combind and plotted using a boxplot.
+The flow loads the wine dataset, changes the *class* column from Integer to String and proceeds to run 20 iterations of four different sampling methods. The result from the sampling is passed to decision tree learners and predictors using the same parameters. Accuracy statistics for each sampling method are gathered and finally combined and plotted using a boxplot.
 
 The resulting dataframe contains mean accuracy of each method for every one of the 20 iterations.
 
-The boxplot of the mean accuracies is shown here:
+The boxplot of the mean accuracies is shown below:
 
+![WINE Accuracy Boxplot](images/problem2-boxplot.png)
 
-![](images/problem2-boxplot.png)
-
-The results are similar to what we've observed using R - the flow is exported as *csmdm_assignment_problem2wine.knar.knwf*.
+.
 
 Let's proceed with applying the same technique to the Titanic dataset.
 
 # Solution in KNIME - TITANIC
 We are now going to solve problem #2 in KNIME using the TITANIC dataset.
 
-The nature of the TITANIC dataset is discussed in the R solution of Problem #2 - its label column is called $Survived$. In order to reuse as much as possible of our KNIME workflow for the WINE dataset, we will transform the TITANIC dataset to a WINE-like dataset. This involves renaming the $Survived$ column to $class$. Once we have done this, we can reuse all of the logic in the loops and the boxplot.
-
-Our KNIME workflow for the TITANIC dataset therefore looks like this:
-
-![](images/problem2-titanic-workflow.png)
+The nature of the TITANIC dataset is discussed in the R solution of Problem #2 - its label column is called $Survived$. In order to reuse as much as possible from our KNIME workflow for the WINE dataset, we will transform the TITANIC dataset to a WINE-like dataset. This involves renaming the $Survived$ column to $class$. Once we have done this, we can reuse all of the logic in the loops and the boxplot.
 
 The flow then works exactly as it does on the WINE dataset but it uses the TITANIC dataset instead.
 
-After they are calculated, the mean accuracies are plotted here:
+![TITANIC Workflow](images/problem2-titanic-workflow.png)
+![TITANIC Accuracy Boxplot](images/problem2-titanic-boxplot.png)
 
 
-![](images/problem2-titanic-boxplot.png)
+# Discussion
+Both problem one and problem two allow us to showcase features of two environments that can interact very well with each other, R and KNIME. Solving the problems in two different environments but using the same methods and concepts serves as a reminder that one can almost always solve a problem using more than one tool, however the tools that we use define our frame of reference.
 
-The results are similar to what we've observed using previously with the WINE dataset.
-The TITANIC KNIME workflow is exported as *csmdm_assignment_problem2titanic.knar.knwf*.
+Problem one shows us that we can use a number of clustering algorithms and distance metrics, we can "cut the tree" at different levels, etc. but ultimately for best results one needs to try multiple methods and parameters and choose the best combination according to his or her own views.
+
+Problem two helps us build a framework for general purpose classifications tasks where we have one class variable that we ultimately try to predict using the rest of the attributes in the dataset. There are different sampling methods we can use to split a datasaet into training and test sets and what is important is that the way we sample the data affects our model accuracy. Testing accuracies for different sampling methods has presented us the opportunity to also measure performance of different models in addition to sampling methods. This kind of framework gives a practitioner a solid approach to working on classification problems and being able to easily compare accuracies of different models and sampling methods for the same datasets.
