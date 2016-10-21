@@ -261,7 +261,7 @@ get_accuracy_stats <- function(df, f_model, model_name) {
 }
 ```
 
-We proceed to run the $get_accuracy_stats$ twenty times with our two models, $wine_model1$ and $wine_model2$.
+We proceed to run the *get_accuracy_stats* twenty times with our two models, *wine_model1* and *wine_model2*.
 This will give us model accuracies for the two models using the four different sampling methods.
 ```{r}
 num_trials <- 20
@@ -394,19 +394,11 @@ We are now going to solve problem #2 in KNIME using the WINE dataset.
 To make things easier, we've downloaded *wine.data* as *wine.csv* and we've set the following header row:
 class, alcohol, malic.acid, ash, alcalinity.of.ash, magnesium, total.phenols, flavanoids, nonflavanoid.phenols, proanthocyanins, color.intensity, hue, od280od315.of.dliuted.wines, proline
 
-We then go through the following KNIME workflow:
+
+The flow loads the wine dataset, changes the *class* column from Integer to String and proceeds to run 20 iterations of four different sampling methods. The result from the sampling is passed to decision tree learners and predictors using the same parameters. Accuracy statistics for each sampling method are gathered and finally combined and plotted using a boxplot. The resulting dataframe contains mean accuracy of each method for every one of the 20 iterations.
 
 ![WINE Workflow](images/problem2-workflow.png)
-
-The flow loads the wine dataset, changes the *class* column from Integer to String and proceeds to run 20 iterations of four different sampling methods. The result from the sampling is passed to decision tree learners and predictors using the same parameters. Accuracy statistics for each sampling method are gathered and finally combined and plotted using a boxplot.
-
-The resulting dataframe contains mean accuracy of each method for every one of the 20 iterations.
-
-The boxplot of the mean accuracies is shown below:
-
 ![WINE Accuracy Boxplot](images/problem2-boxplot.png)
-
-.
 
 Let's proceed with applying the same technique to the Titanic dataset.
 
